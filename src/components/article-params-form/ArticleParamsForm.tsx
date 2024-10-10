@@ -1,21 +1,24 @@
-import { ArrowButton } from 'src/ui/arrow-button';
-import { FontFamilySelector } from 'src/ui/select/FontFamilySelector'; // Компонент выбора шрифта
-import { FontColorSelector } from 'src/ui/select/FontColorSelector'; // Компонент выбора цвета шрифта
-import { ContentWidthSelector } from 'src/ui/select/ContentWidthSelector'; // Компонент выбора ширины контента
-import { BackgroundColorSelector } from 'src/ui/select/BackgroundColorSelector'; // Компонент выбора цвета фона
-import { FontSizeSelector } from 'src/ui/radio-group/FontSizeSelector';
-import { Separator } from 'src/ui/separator'; // Сепаратор
-import { Button } from 'src/ui/button';
-import { Text } from 'src/ui/text'; // Настройка стилей текста
-
+import { useState, useRef } from 'react';
 import clsx from 'clsx';
+import {
+	defaultArticleState,
+	OptionType,
+	backgroundColors,
+	fontColors,
+	contentWidthArr,
+	fontFamilyOptions,
+	fontSizeOptions,
+} from 'src/constants/articleProps';
+import { Text } from 'src/ui/text';
+import { Select } from 'src/ui/select/Select';
+import { RadioGroup } from 'src/ui/radio-group';
+import { Separator } from 'src/ui/separator';
+import { Button } from 'src/ui/button';
+import { ArrowButton } from 'src/ui/arrow-button';
+import { useOutsideClickClose } from 'src/ui/select/hooks/useOutsideClickClose';
+
 import styles from './ArticleParamsForm.module.scss';
-import { useState } from 'react';
 
-// Импортируем OptionType
-import { OptionType } from 'src/constants/articleProps';
-
-// Определяем интерфейс для параметров статьи
 interface ArticleParams {
 	fontFamilyOption: OptionType;
 	fontColor: OptionType;
@@ -24,101 +27,120 @@ interface ArticleParams {
 	fontSizeOption: OptionType;
 }
 
-// Типизация для пропсов компонента
 interface ArticleParamsFormProps {
-	articleParams: ArticleParams; // Текущие параметры статьи
-	onParamChange: (paramName: keyof ArticleParams, value: OptionType) => void;
-	onApplyChanges: () => void; // Обработчик для применения изменений
-	onResetChanges: () => void; // Обработчик для сброса
+	onApplyChanges: (params: ArticleParams) => void;
 }
 
 export const ArticleParamsForm = ({
-	articleParams,
-	onParamChange,
 	onApplyChanges,
-	onResetChanges,
 }: ArticleParamsFormProps) => {
-	// Состояние для открытия/закрытия формы
+	const [articleParams, setArticleParams] =
+		useState<ArticleParams>(defaultArticleState);
 	const [isOpen, setIsOpen] = useState(false);
+	const formRef = useRef<HTMLDivElement>(null); // Создаём реф для формы
 
-	// Обработчик клика по ArrowButton
-	const toggleMenu = () => {
+	// Используем кастомный хук для закрытия формы при клике за её пределами
+	useOutsideClickClose({
+		isOpen,
+		rootRef: formRef, // Передаём реф на форму
+		onChange: setIsOpen,
+	});
+
+	const toggleMenu = (e: React.MouseEvent) => {
+		// Убираем распространение закрытия формы по оверлею
+		e.stopPropagation();
 		setIsOpen((prevState) => !prevState);
+	};
+
+	const handleParamChange = (
+		paramName: keyof ArticleParams,
+		value: OptionType
+	) => {
+		setArticleParams((prevState) => ({
+			...prevState,
+			[paramName]: value,
+		}));
+	};
+
+	const resetChanges = () => {
+		setArticleParams(defaultArticleState);
+	};
+
+	const applyChanges = () => {
+		onApplyChanges(articleParams);
+	};
+
+	// Убрать закрытие формы при клике внутри селектора
+	const handleClickInside = (e: React.MouseEvent) => {
+		e.stopPropagation();
 	};
 
 	return (
 		<>
 			<ArrowButton isOpen={isOpen} onClick={toggleMenu} />
 			<aside
+				ref={formRef}
 				className={clsx(styles.container, { [styles.container_open]: isOpen })}>
 				<form
+					onClick={handleClickInside}
 					className={styles.form}
 					onSubmit={(e) => {
 						e.preventDefault();
+						applyChanges();
 					}}>
 					<Text as='h2' size={31} weight={800} uppercase>
 						Задайте параметры
 					</Text>
 
 					{/* Выбор шрифта */}
-					<FontFamilySelector
-						selectedFont={articleParams.fontFamilyOption}
-						onFontChange={(value: OptionType) =>
-							onParamChange('fontFamilyOption', value)
-						} // Используем универсальный обработчик
+					<Select
+						title='Выбор шрифта'
+						options={fontFamilyOptions}
+						selected={articleParams.fontFamilyOption}
+						onChange={(value) => handleParamChange('fontFamilyOption', value)}
 					/>
 
 					{/* Выбор размера шрифта */}
-					<FontSizeSelector
-						selectedFontSize={articleParams.fontSizeOption} // Передаем текущий выбранный размер шрифта
-						onFontSizeChange={(value: OptionType) =>
-							onParamChange('fontSizeOption', value)
-						} // Используем универсальный обработчик
+					<RadioGroup
+						name='widthSelector'
+						title='Размер шрифта'
+						options={fontSizeOptions}
+						selected={articleParams.fontSizeOption}
+						onChange={(value) => handleParamChange('fontSizeOption', value)}
 					/>
 
 					{/* Выбор цвета текста */}
-					<FontColorSelector
-						// Добавляем обработчик для цвета шрифта
-						selectedColor={articleParams.fontColor}
-						onColorChange={(value: OptionType) =>
-							onParamChange('fontColor', value)
-						} // Используем универсальный обработчик
+					<Select
+						title='Цвет текста'
+						options={fontColors}
+						selected={articleParams.fontColor}
+						onChange={(value) => handleParamChange('fontColor', value)}
 					/>
 
-					{/* Разделитель */}
 					<Separator />
 
 					{/* Выбор цвета фона */}
-					<BackgroundColorSelector
-						selectedBackgroundColor={articleParams.backgroundColor} // Передаем текущий цвет фона
-						onBackgroundColorChange={(value: OptionType) =>
-							onParamChange('backgroundColor', value)
-						} // Используем универсальный обработчик
+					<Select
+						title='Цвет фона'
+						options={backgroundColors}
+						selected={articleParams.backgroundColor}
+						onChange={(value) => handleParamChange('backgroundColor', value)}
 					/>
 
 					{/* Выбор ширины контента */}
-					<ContentWidthSelector
-						selectedContentWidth={articleParams.contentWidth} // Передаем текущую ширину контента
-						onContentWidthChange={(value: OptionType) =>
-							onParamChange('contentWidth', value)
-						} // Используем универсальный обработчик
+					<Select
+						title='Ширина контента'
+						options={contentWidthArr}
+						selected={articleParams.contentWidth}
+						onChange={(value) => handleParamChange('contentWidth', value)}
 					/>
 
 					<div className={styles.bottomContainer}>
 						{/* Кнопка "Сбросить" */}
-						<Button
-							title='Сбросить'
-							type='clear'
-							onClick={onResetChanges} // Используем обработчик сброса
-						/>
+						<Button title='Сбросить' type='clear' onClick={resetChanges} />
 
 						{/* Кнопка "Применить" */}
-						<Button
-							title='Применить'
-							htmlType='submit'
-							type='apply'
-							onClick={onApplyChanges}
-						/>
+						<Button title='Применить' htmlType='submit' type='apply' />
 					</div>
 				</form>
 			</aside>
